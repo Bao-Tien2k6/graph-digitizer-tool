@@ -1,0 +1,51 @@
+name,author,doi,source_image,n_points,figure_file
+01_Ramezani2024_pH-Qe,Amir M. Ramezani_2024,https://doi.org/10.1016/j.matchemphys.2024.129223,1,7,01_Ramezani2024_pH-Qe.png
+02_Ramezani2024_AD-Qe,Amir M. Ramezani_2024,https://doi.org/10.1016/j.matchemphys.2024.129223,2,6,02_Ramezani2024_AD-Qe.png
+03_Ramezani2024_Tem-Qe,Amir M. Ramezani_2024,https://doi.org/10.1016/j.matchemphys.2024.129223,3,5,03_Ramezani2024_Tem-Qe.png
+04_Ramezani2024_Time-Qt,Amir M. Ramezani_2024,https://doi.org/10.1016/j.matchemphys.2024.129223,4,12,04_Ramezani2024_Time-Qt.png
+05_Abdelkawy2025_pH-RR,Ali M. Abdelkawy_2025,https://doi.org/10.1007/s12247-025-09988-1,5,5,05_Abdelkawy2025_pH-RR.png
+06_Abdelkawy2025_AD-RR,Ali M. Abdelkawy_2025,https://doi.org/10.1007/s12247-025-09988-1,6,9,06_Abdelkawy2025_AD-RR.png
+07_Abdelkawy2025_Tem-RR,Ali M. Abdelkawy_2025,https://doi.org/10.1007/s12247-025-09988-1,7,5,07_Abdelkawy2025_Tem-RR.png
+08_Abdelkawy2025_Time-RR,Ali M. Abdelkawy_2025,https://doi.org/10.1007/s12247-025-09988-1,8,14,08_Abdelkawy2025_Time-RR.png
+09_Abdelkawy2025_pH-RR,Ali M. Abdelkawy_2025,https://doi.org/10.12911/22998993/210143 ,9,11,09_Abdelkawy2025_pH-RR.png
+10_Abdelkawy2025_AD-RR,Ali M. Abdelkawy_2025,https://doi.org/10.12911/22998993/210143 ,10,4,10_Abdelkawy2025_AD-RR.png
+11_Abdelkawy2025_Ci-RR,Ali M. Abdelkawy_2025,https://doi.org/10.12911/22998993/210143 ,11,5,11_Abdelkawy2025_Ci-RR.png
+12_Abdelkawy2025_Time-RR,Ali M. Abdelkawy_2025,https://doi.org/10.12911/22998993/210143 ,12,9,12_Abdelkawy2025_Time-RR.png
+13_Correa2025_Time-Qt,Fernanda G. Corrêa_2025,https://doi.org/10.3390/min15090899,13,7,13_Correa2025_Time-Qt.png
+14_Correa2025_Time-Qt,Fernanda G. Corrêa_2025,https://doi.org/10.3390/min15090899,14,7,14_Correa2025_Time-Qt.png
+15_Correa2025_Time-Qt,Fernanda G. Corrêa_2025,https://doi.org/10.3390/min15090899,15,7,15_Correa2025_Time-Qt.png
+16_Correa2025_Time-Qt,Fernanda G. Corrêa_2025,https://doi.org/10.3390/min15090899,16,7,16_Correa2025_Time-Qt.png
+17_Correa2025_Time-Qt,Fernanda G. Corrêa_2025,https://doi.org/10.3390/min15090899,17,7,17_Correa2025_Time-Qt.png
+18_Correa2025_pH-RR,Fernanda G. Corrêa_2025,https://doi.org/10.3390/min15090899,18,4,18_Correa2025_pH-RR.png
+19_Bansal2025_pH-RR,Mehak Bansal_2025,https://doi.org/10.1016/j.ijbiomac.2024.138329,19,6,19_Bansal2025_pH-RR.png
+20_Bansal2025_Ci-RR,Mehak Bansal_2025,https://doi.org/10.1016/j.ijbiomac.2024.138329,20,5,20_Bansal2025_Ci-RR.png
+21_Bansal2025_Time-RR,Mehak Bansal_2025,https://doi.org/10.1016/j.ijbiomac.2024.138329,21,7,21_Bansal2025_Time-RR.png
+22_Mahgoub2020_pH-RR,Samar M. Mahgoub_2020,https://doi.org/10.1039/D0RA04898D,22,5,22_Mahgoub2020_pH-RR.png
+23_Mahgoub2020_AD-RR,Samar M. Mahgoub_2020,https://doi.org/10.1039/D0RA04898D,23,9,23_Mahgoub2020_AD-RR.png
+24_Mahgoub2020_Tem-RR,Samar M. Mahgoub_2020,https://doi.org/10.1039/D0RA04898D,24,5,24_Mahgoub2020_Tem-RR.png
+25_Elhaci2020_pH-Qe,Amina Elhaci_2020,https://doi.org/10.1080/03067319.2020.1715374,25,5,25_Elhaci2020_pH-Qe.png
+26_Elhaci2020_Time-Qt,Amina Elhaci_2020,https://doi.org/10.1080/03067319.2020.1715374,26,9,26_Elhaci2020_Time-Qt.png
+27_Elhaci2020_Time-Qt,Amina Elhaci_2020,https://doi.org/10.1080/03067319.2020.1715374,27,9,27_Elhaci2020_Time-Qt.png
+28_Elhaci2020_Time-Qt,Amina Elhaci_2020,https://doi.org/10.1080/03067319.2020.1715374,28,14,28_Elhaci2020_Time-Qt.png
+29_Elhaci2020_Tem-Qe,Amina Elhaci_2020,https://doi.org/10.1080/03067319.2020.1715374,29,3,29_Elhaci2020_Tem-Qe.png
+30_Manzar2024_pH-Qe,Mohammad Saood Manzar_2024,https://doi.org/10.1007/s11356-024-34837-y,30,5,30_Manzar2024_pH-Qe.png
+31_Manzar2024_pH-Qe,Mohammad Saood Manzar_2024,https://doi.org/10.1007/s11356-024-34837-y,30,5,31_Manzar2024_pH-Qe.png
+32_Manzar2024_Time-Qt,Mohammad Saood Manzar_2024,https://doi.org/10.1007/s11356-024-34837-y,31,14,32_Manzar2024_Time-Qt.png
+33_Manzar2024_Time-Qt,Mohammad Saood Manzar_2024,https://doi.org/10.1007/s11356-024-34837-y,31,14,33_Manzar2024_Time-Qt.png
+34_Manzar2024_Time-Qt,Mohammad Saood Manzar_2024,https://doi.org/10.1007/s11356-024-34837-y,32,14,34_Manzar2024_Time-Qt.png
+35_Manzar2024_Time-Qt,Mohammad Saood Manzar_2024,https://doi.org/10.1007/s11356-024-34837-y,32,14,35_Manzar2024_Time-Qt.png
+36_Sepehr2016_pH-RR,Mohammad Noori Sepehr_2016,http://dx.doi.org/10.1016/j.arabjc.2016.07.003,33,4,36_Sepehr2016_pH-RR.png
+37_Sepehr2016_Time-RR,Mohammad Noori Sepehr_2016,http://dx.doi.org/10.1016/j.arabjc.2016.07.003,34,14,37_Sepehr2016_Time-RR.png
+38_Sepehr2016_Time-RR,Mohammad Noori Sepehr_2016,http://dx.doi.org/10.1016/j.arabjc.2016.07.003,34,14,38_Sepehr2016_Time-RR.png
+39_Sepehr2016_Time-RR,Mohammad Noori Sepehr_2016,http://dx.doi.org/10.1016/j.arabjc.2016.07.003,34,14,39_Sepehr2016_Time-RR.png
+40_Sepehr2016_Time-RR,Mohammad Noori Sepehr_2016,http://dx.doi.org/10.1016/j.arabjc.2016.07.003,34,14,40_Sepehr2016_Time-RR.png
+41_Sepehr2016_Tem-RR,Mohammad Noori Sepehr_2016,http://dx.doi.org/10.1016/j.arabjc.2016.07.003,35,5,41_Sepehr2016_Tem-RR.png
+42_Allou2018_pH-RR,N’guadi Blaise Allou_2018,https://doi.org/10.1016/j.jece.2017.12.015,36,6,42_Allou2018_pH-RR.png
+43_Allou2018_AD-RR,N’guadi Blaise Allou_2018,https://doi.org/10.1016/j.jece.2017.12.015,37,6,43_Allou2018_AD-RR.png
+44_Allou2018_Time-Qe,N’guadi Blaise Allou_2018,https://doi.org/10.1016/j.jece.2017.12.015,38,10,44_Allou2018_Time-Qe.png
+45_Allou2018_Time-Qe,N’guadi Blaise Allou_2018,https://doi.org/10.1016/j.jece.2017.12.015,38,10,45_Allou2018_Time-Qe.png
+46_Allou2018_Time-Qe,N’guadi Blaise Allou_2018,https://doi.org/10.1016/j.jece.2017.12.015,38,10,46_Allou2018_Time-Qe.png
+47_Allou2018_Time-Qe,N’guadi Blaise Allou_2018,https://doi.org/10.1016/j.jece.2017.12.015,38,10,47_Allou2018_Time-Qe.png
+48_Allou2018_Time-Qe,N’guadi Blaise Allou_2018,https://doi.org/10.1016/j.jece.2017.12.015,38,10,48_Allou2018_Time-Qe.png
+49_Mahgoub2020_pH-Qe,Samar M. Mahgoub_2020,http://dx.doi.org/10.1016/j.cej.2012.09.026,39,6,49_Mahgoub2020_pH-Qe.png
+50_Mahgoub2020_pH-Qe,Samar M. Mahgoub_2020,http://dx.doi.org/10.1016/j.cej.2012.09.026,39,9,50_Mahgoub2020_pH-Qe.png
