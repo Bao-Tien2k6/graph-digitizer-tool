@@ -143,13 +143,13 @@ def _locate_axis_lines(grey: np.ndarray) -> Tuple[int, int]:
     pool_h.sort(key=lambda t: -t[1])
     x_axis_row = int(pool_h[0][0])
 
-    # Y-axis (left): prefer lines in the left 40% of image
-    # pick the LEFTMOST one, not the longest to differentiate with bar chart.
     # v_left = [(x, l) for x, l in v_candidates if x < w * 0.45]
     # pool_v = v_left if len(v_left) >= 1 else v_candidates
-    # pool_v.sort(key=lambda t: -t[1])
-    # y_axis_col = int(pool_v[0][0])
-    v_left = [(x, l) for x, l in v_candidates if x < w * 0.45]
+    # exclude vertical Canny edges within 5% of the image's left edge.
+    LEFT_EDGE_GUARD_FRAC = 0.05
+    guard_px = int(w * LEFT_EDGE_GUARD_FRAC)
+    v_left = [(x, l) for x, l in v_candidates
+              if x < w * 0.45 and x >= guard_px]
     pool_v = v_left if len(v_left) >= 1 else v_candidates
 
     max_len = max(l for _, l in pool_v)
