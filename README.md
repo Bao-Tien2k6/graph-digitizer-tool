@@ -2,6 +2,10 @@
 
 > A computer-vision pipeline that converts scientific figures (scatter plots, bar charts,
 > line plots) into structured numerical data — CSV, JSON, or Excel — with no manual point-clicking.
+>
+> Backend: **FastAPI** wrapping the CV pipeline. Frontend: **React + Vite** with
+> a Konva canvas (drag misplaced markers, right-click to delete), TanStack Table
+> (inline-edit rows), Zustand (client state), and SheetJS (CSV/JSON/XLSX export).
 
 ---
 
@@ -29,8 +33,9 @@ and returns the underlying data points as machine-readable numbers.
 | **Bar chart** | Bar-top pixel position per group | (label, value) table |
 | **Line plot** | Discrete marker blobs along traced curves | (x, y) table per line |
 
-All outputs include a validation overlay PNG for visual inspection, plus the raw
-results saved to disk under `tests/result/<image-stem>/`.
+Once `/api/calibrate` returns the affine matrix and points, every interactive
+edit (drag a marker, edit a cell, delete a row, export to CSV/JSON/XLSX) is
+pure client-side state — no server round-trip.
 
 ---
 
@@ -97,40 +102,54 @@ Input image (PNG / JPEG)
 ```
 graph-digitizer-tool/
 │
-├── main.py                       ← Streamlit entry point (run from repo root)
-│
-├── app/                          ← Streamlit web application
+├── api/                          ← FastAPI backend (replaces the old Streamlit app)
 │   ├── __init__.py
-│   ├── ui_components.py          ← Upload widget, preview, download buttons
-│   └── calibration.py            ← Interactive axis calibration step
+│   ├── main.py                   ← /digitize, /calibrate, /image, /session, /healthz
+│   └── schemas.py                ← Pydantic v2 request / response models
 │
-├── pipeline/                     ← Core CV pipeline (no UI dependency)
+├── frontend/                     ← React + Vite web client
+│   ├── package.json
+│   ├── vite.config.js            ← Dev proxy /api → localhost:8000
+│   ├── tailwind.config.js / postcss.config.js / components.json
+│   ├── index.html
+│   └── src/
+│       ├── main.jsx, App.jsx, index.css
+│       ├── lib/
+│       │   ├── api.js            ← fetch wrappers for /digitize, /calibrate
+│       │   └── utils.js          ← cn() helper for shadcn / Tailwind
+│       ├── store/
+│       │   └── useDigitizerStore.js   ← Zustand: image, axes, points, affine, history
+│       └── components/
+│           ├── FileUploadZone.jsx     ← drag-drop PNG/JPG → /api/digitize
+│           ├── ImageCanvas.jsx        ← react-konva: drag, zoom, right-click delete
+│           ├── CalibrationPanel.jsx   ← per-tick inputs + "Detect points"
+│           ├── DataTable.jsx          ← TanStack Table: click-to-edit, sort, delete
+│           ├── ExportBar.jsx          ← SheetJS: CSV / JSON / XLSX (client-side)
+│           └── ui/                    ← shadcn primitives (button, card, input, …)
+│
+├── pipeline/                     ← Core CV pipeline (no UI dependency, unchanged)
 │   ├── preprocess.py             ← Stage 1 · Ingest & pre-process
 │   ├── axes_detector.py          ← Stage 2 · Axis localisation + tick OCR matching
 │   ├── text_mask.py              ← Shared text-region mask from global OCR
 │   ├── parallel_router.py        ← Stage 3 · Detector dispatch + confidence routing
 │   ├── scatter_detector.py       ← Stage 4a · Scatter marker detection
-│   ├── scatter_copy.py           ← Scatter detector variant / experiments
 │   ├── bar_detector.py           ← Stage 4b · Bar top detection
 │   ├── line_detector.py          ← Stage 4c · Line tracing + marker isolation
 │   └── coordinate_transform.py   ← Stage 5 · Pixel → data transform + export
 │
+├── docs/
+│   └── ui/                       ← Static HTML mockups of each app view
+│       ├── styles.css
+│       ├── index.html
+│       ├── 01-upload.html
+│       ├── 02-calibration.html
+│       ├── 03-data-editor.html
+│       └── 04-results.html
+│
 ├── scripts/                      ← One-off debug & per-figure regression scripts
-│   ├── backtest_all.py
-│   ├── extract_example1.py
-│   ├── test_one_image.py
-│   └── test_*.py / debug_*.py / viz_*.py
 │
 ├── tests/
 │   ├── sample_figures/           ← Input figures grouped by chart category
-│   │   ├── Demo/
-│   │   ├── bar chart/
-│   │   ├── bar chart (no xticks)/
-│   │   ├── stacked bar chart/
-│   │   ├── points only/
-│   │   ├── intepolated line (focus on points)/
-│   │   ├── multiple line charts/
-│   │   └── [done] normal line chart/
 │   ├── ground_truth/             ← 52 CSVs + _manifest.csv (per-figure truth data)
 │   ├── result/                   ← Pipeline outputs per image stem
 │   └── test_preprocess.py
@@ -144,19 +163,46 @@ graph-digitizer-tool/
 
 ## File-by-File Reference
 
-### `main.py`
-Streamlit entry point at the repo root. Bootstraps page layout, initialises session
-state, loads PaddleOCR once via `@st.cache_resource`, runs Stage 1 + Stage 2 on
-upload, then Stage 3 + Stage 5 after the user confirms calibration. Supports a
-batch queue for multiple uploaded images.
+### `api/main.py`
+FastAPI app. Loads PaddleOCR once via the `lifespan` context, keeps an in-memory
+session cache (30-min TTL) of the preprocessed image + global OCR + `AxesInfo`,
+and exposes five JSON routes:
 
-### `app/ui_components.py`
-Reusable Streamlit widgets: image upload, preview, detected-point overlay viewer,
-result data table, format selector, and download buttons.
+| Route | Purpose |
+|---|---|
+| `POST /api/digitize` | multipart upload → Stage 1 + global OCR + Stage 2 |
+| `POST /api/calibrate` | apply corrected ticks, refit scale, run Stage 3 + transform |
+| `GET /api/image/{id}` | serve the preprocessed PNG for the canvas |
+| `DELETE /api/session/{id}` | release the cache entry |
+| `GET /api/healthz` | liveness probe |
 
-### `app/calibration.py`
-Interactive calibration step. Renders the detected axes / tick labels and lets the
-user correct any OCR misread before Stage 3 fires.
+### `api/schemas.py`
+Pydantic v2 models (`DigitizeResponse`, `CalibrateRequest`, `CalibrateResponse`,
+`PointPayload`, etc.). All numeric fields are plain `float`/`int` so the JSON
+payload is portable and the frontend can apply the affine matrix locally.
+
+### `frontend/src/store/useDigitizerStore.js`
+Zustand store — holds `sessionId`, `imageUrl`, `axes`, `points`, `affine`, and an
+edit history stack. Implements `movePoint`, `updatePointField`, `deletePoint`,
+and inline pixel↔data math (linear and log10).
+
+### `frontend/src/components/ImageCanvas.jsx`
+react-konva canvas. Renders the preprocessed image plus one `<Circle>` per
+detected point; markers are `draggable` (drag → `movePoint`), right-click /
+double-click deletes, wheel zooms, stage drag pans.
+
+### `frontend/src/components/CalibrationPanel.jsx`
+Per-tick number inputs for both axes plus scale R² chips. The "Detect points"
+button posts the corrected ticks to `/api/calibrate`.
+
+### `frontend/src/components/DataTable.jsx`
+TanStack Table. Click an x/y cell to edit it (commits on Enter / blur). Rows
+sort by series / x / y; hover highlights the matching canvas marker; per-row
+delete button. An Undo button reverses the last edit using the store's history.
+
+### `frontend/src/components/ExportBar.jsx`
+SheetJS-backed export buttons (CSV / JSON / XLSX). Runs entirely in the browser
+— no `/api/export` round-trip.
 
 ### `pipeline/preprocess.py`
 **Stage 1.** Accepts bytes or a NumPy array. Returns a normalised BGR image
@@ -205,6 +251,7 @@ are written to `tests/result/<stem>/`.
 ### Prerequisites
 
 - Python 3.10 or higher ([download](https://www.python.org/downloads/))
+- Node.js 18 or higher (20+ recommended) ([download](https://nodejs.org/))
 - `git` (to clone the repository)
 
 ---
@@ -251,7 +298,7 @@ source venv/bin/activate
 
 ---
 
-### Step 4 — Install dependencies
+### Step 4 — Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -262,28 +309,56 @@ pip install -r requirements.txt
 
 ---
 
-### Step 5 — Launch the web app
+### Step 5 — Install frontend dependencies
 
 ```bash
-streamlit run main.py
+cd frontend
+npm install
+cd ..
 ```
 
-Streamlit will open **http://localhost:8501** in your default browser.
+This installs React, Vite, Tailwind, shadcn primitives, Konva, TanStack Table,
+Zustand, and SheetJS (~185 packages).
 
 ---
 
-### Step 6 — Use the app
+### Step 6 — Launch the app (two terminals)
+**Terminal 1 - backend (FastAPI app)**
 
-1. **Upload a figure** — drag-and-drop one or more PNG/JPEG charts. Multiple
-   files are queued; you advance with the **Next image** button.
-2. **Wait for axis detection** — PaddleOCR runs a single global pass, then the
-   axes detector matches tokens to ticks.
-3. **Verify calibration** — review the detected tick values, edit any that the
-   OCR misread, then click **Confirm Calibration**.
-4. **View results** — the extracted data table appears below the image, with an
-   overlay PNG showing detected points.
-5. **Download** — save results as **CSV**, **XLSX**, or the **overlay PNG**.
-   Files are also persisted on disk at `tests/result/<image-stem>/`.
+```bash
+python -m uvicorn api.main:app --reload --port 8000
+```
+
+**Terminal 2 — frontend (Vite dev server on port 5173):**
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open **http://localhost:5173**. The Vite dev server proxies `/api/*` to the
+FastAPI backend, so no CORS configuration is needed in development.
+
+---
+
+### Step 7 — Use the app
+
+1. **Upload a figure** — drag-and-drop a single PNG/JPG chart into the upload
+   zone. The backend runs Stage 1 (preprocess) + global OCR + Stage 2 (axes).
+2. **Verify calibration** — review the detected tick values in the right panel,
+   edit any that OCR misread, then click **Detect points**. The backend runs
+   Stage 3 (routing) + Stage 5 (transform) and returns the points + affine
+   matrix.
+3. **Refine on the canvas** — drag any misplaced marker to its correct pixel;
+   the (x, y) values update via the inverse affine. Right-click or
+   double-click a marker to delete it.
+4. **Refine in the table** — click an x or y cell to edit it; the corresponding
+   marker moves on the canvas. Click the row delete button to remove a point.
+5. **Export** — click **CSV**, **JSON**, or **XLSX**. SheetJS builds the file
+   in the browser and triggers a download.
+
+All editing in steps 3–5 is pure client state — there is no `/api/export` and no
+re-run of the pipeline.
 
 ---
 
@@ -325,11 +400,12 @@ deactivate
 
 | Option | Command / Notes |
 |---|---|
-| **Local (Streamlit)** | `streamlit run main.py` — opens on http://localhost:8501 |
-| **Streamlit Community Cloud** | Push to GitHub; connect the repo at [share.streamlit.io](https://share.streamlit.io). Set entry point to `main.py`. |
-| **Custom server** | Any host with Python 3.10+; repeat Steps 2–5 above, then expose port 8501. |
+| **Local (dev)** | `uvicorn api.main:app --reload --port 8000` + `cd frontend && npm run dev` — Vite proxies `/api/*` to the backend. |
+| **Local (single port)** | `cd frontend && npm run build` produces `frontend/dist/`. Serve those static assets from FastAPI (or any static host) and point the frontend at the backend's origin. |
+| **Custom server** | Any host with Python 3.10+ and Node 18+. Run uvicorn behind a reverse proxy (nginx / Caddy); serve `frontend/dist/` as static files; route `/api/*` to uvicorn. |
 
-> Docker and GitHub Actions CI/CD are planned (M7) but not yet present in the repo.
+> Docker images and GitHub Actions CI/CD are planned (M7) but not yet present in
+> the repo.
 
 ---
 
@@ -342,5 +418,6 @@ deactivate
 | **M3** — Scatter detector | Blob/contour marker detection; colour-based series separation | ✅ |
 | **M4** — Line detector | Skeleton tracing + marker isolation; dashed-line handling | ✅ |
 | **M5** — Routing | Confidence scoring + mixed-chart detection (parallel execution pending) | 🟡 |
-| **M6** — Streamlit app | Calibration correction, overlay preview, multi-format export, batch queue | ✅ |
+| **M6** — Streamlit MVP | Calibration UI + batch upload + overlay preview (superseded by M6.5) | ✅ |
+| **M6.5** — FastAPI + React rewrite | Konva drag-to-edit canvas, TanStack inline editing, Zustand state, SheetJS export — all client-side after `/api/calibrate` | ✅ |
 | **M7** — GitHub deploy | CI/CD, Docker, executable builds | ⬜ |

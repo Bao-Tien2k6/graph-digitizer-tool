@@ -7,6 +7,9 @@ numpy==1.26.4
 opencv-python-headless==4.9.0.80
 opencv-contrib-python==4.9.0.80
 paddleocr==2.8.1
-streamlit>=1.28.0
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+pydantic>=2.6
 openpyxl>=3.1.0
 matplotlib>=3.7.0

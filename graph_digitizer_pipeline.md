@@ -4,7 +4,7 @@
 
 A computer-vision pipeline that detects and extracts data point values from scatterplots, bar graphs, and line plots in scientific figures — turning image pixels back into numbers.
 
-`OpenCV` `PaddleOCR` `Streamlit` `Python 3.10+`
+`OpenCV` `PaddleOCR` `FastAPI` `React + Vite` `Konva.js` `TanStack Table` `Zustand` `shadcn/ui + Tailwind` `Python 3.10+` `Node 18+`
 
 ---
 
@@ -40,7 +40,9 @@ Trace curve paths, isolate marker points on each line, and recover the series va
 
 > **Design principle:** Each stage is a standalone module with a clean interface. Researchers can override any single stage (e.g. correct an OCR tick label in the calibration UI) without rerunning the full pipeline. Stage 3 also naturally handles **mixed charts** (e.g. a line + scatter overlay) by letting multiple detectors report results simultaneously.
 
-> **OCR is hoisted to the top level.** PaddleOCR is heavy to initialise, so the app loads it once via `@st.cache_resource` and passes the single OCR result down to both the axes detector and the shared text-mask builder (`pipeline/text_mask.py`). This avoids running OCR three times on the same figure.
+> **OCR is hoisted to the top level.** PaddleOCR is heavy to initialise, so the FastAPI backend loads it once in the app `lifespan` context and reuses the engine across every `/api/digitize` call. The single OCR result is passed down to both the axes detector and the shared text-mask builder (`pipeline/text_mask.py`), avoiding three OCR runs on the same figure.
+
+> **Architecture split (M6.5).** The original Streamlit MVP has been replaced by a FastAPI backend (`api/`) and a React + Vite frontend (`frontend/`). The CV pipeline (`pipeline/`) is unchanged. Once `/api/calibrate` returns the points and the pixel→data affine matrix, every interactive edit — dragging a misplaced marker on the Konva canvas, editing a cell in the TanStack table, deleting a row, exporting CSV/JSON/XLSX via SheetJS — happens in the browser, with no server round-trip.
 
 ---
 
@@ -169,32 +171,44 @@ Convert pixel positions to real data values.
 
 ## 05 · Deployment
 
-The current version ships as a Streamlit web app launched from the repo root.
+The current version ships as a **FastAPI backend** (`api/`) + **React + Vite frontend** (`frontend/`). The CV pipeline is unchanged and consumed by FastAPI through direct Python imports — no IPC or subprocess.
 
 ### GitHub repository structure (actual)
 
 ```
 graph-digitizer-tool/
-├── main.py                       ← Streamlit entry point
-├── app/
+├── api/
 │   ├── __init__.py
-│   ├── ui_components.py          ← Upload, preview, download buttons
-│   └── calibration.py            ← Interactive axis calibration UI
+│   ├── main.py                   ← FastAPI app, in-memory session cache, PaddleOCR lifespan
+│   └── schemas.py                ← Pydantic v2 request/response models
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.js            ← /api → localhost:8000 dev proxy, @ → /src alias
+│   ├── tailwind.config.js / postcss.config.js / components.json
+│   ├── index.html
+│   └── src/
+│       ├── main.jsx, App.jsx, index.css
+│       ├── lib/api.js            ← fetch wrappers for /digitize, /calibrate
+│       ├── lib/utils.js          ← cn() helper
+│       ├── store/useDigitizerStore.js   ← Zustand client state + affine math
+│       └── components/
+│           ├── FileUploadZone.jsx
+│           ├── ImageCanvas.jsx         ← react-konva: drag, zoom, right-click delete
+│           ├── CalibrationPanel.jsx
+│           ├── DataTable.jsx           ← TanStack Table: inline edit + sort
+│           ├── ExportBar.jsx           ← SheetJS client-side CSV/JSON/XLSX
+│           └── ui/                     ← shadcn primitives
 ├── pipeline/
 │   ├── preprocess.py             ← Stage 1: deskew, CLAHE, upscale
-│   ├── axes_detector.py          ← Stage 2: Hough + OCR-token matching
+│   ├── axes_detector.py          ← Stage 2: Hough + OCR-token matching (+ _fit_scale helper)
 │   ├── text_mask.py              ← Shared text-region mask
 │   ├── parallel_router.py        ← Stage 3: detector dispatch + confidence vote
 │   ├── scatter_detector.py       ← Blob/contour scatter detection
-│   ├── scatter_copy.py           ← Scatter variant for A/B comparison
 │   ├── bar_detector.py           ← Contour analysis for bar tops
 │   ├── line_detector.py          ← Skeleton tracing for line markers
 │   └── coordinate_transform.py   ← Stage 5: pixel→data affine + export
+├── docs/ui/                      ← Static HTML mockups of each app view
 ├── scripts/                      ← Debug & per-figure regression scripts
-│   ├── backtest_all.py
-│   ├── extract_example1.py
-│   ├── test_one_image.py
-│   └── test_*.py / debug_*.py / viz_*.py
 ├── tests/
 │   ├── sample_figures/           ← Inputs grouped by chart category
 │   ├── ground_truth/             ← 52 per-figure CSVs + _manifest.csv
@@ -205,10 +219,22 @@ graph-digitizer-tool/
 └── README.md
 ```
 
+### Backend routes
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/digitize` | Multipart image upload → Stage 1 + global OCR + Stage 2. Returns `session_id`, image URL, and `AxesPayload`. |
+| `POST` | `/api/calibrate` | Apply corrected tick values, refit scale via `pipeline.axes_detector._fit_scale`, run Stage 3 + transform. Returns points + 2×3 affine matrix. |
+| `GET`  | `/api/image/{session_id}` | Stream the preprocessed PNG for the canvas. |
+| `DELETE` | `/api/session/{session_id}` | Release the in-memory session entry (called on "New image"). |
+| `GET`  | `/api/healthz` | Liveness probe. |
+
+> Sessions are kept in process memory with a 30-minute TTL. There is no `/api/export` endpoint: exports are produced client-side by SheetJS using the points already held in Zustand.
+
 ### Planned automation (not yet present)
 
-- **On every push to main — auto-deploy** to Streamlit Community Cloud
-- **On GitHub Release tag — build executables** via PyInstaller
+- **On every push to main — auto-deploy** the FastAPI service + Vite static bundle
+- **On GitHub Release tag — build executables** via PyInstaller (backend) and a packaged static frontend
 - **On every PR — accuracy CI** against `tests/ground_truth/`
 
 These are part of M7 and are not wired up in the repo today.
@@ -219,15 +245,25 @@ These are part of M7 and are not wired up in the repo today.
 
 ### What the researcher sees
 
-**Step 1 — Upload figure(s)**
-Drag one or more PNG/JPG charts into the browser. Multi-file uploads are queued; the app shows *"Image i of N"* and exposes a **Next image** button.
+**Step 1 — Upload a figure**
+Drag a single PNG/JPG chart into the upload zone. The frontend `POST`s it to `/api/digitize`; the backend runs Stage 1, global OCR, and Stage 2, then returns the session id, image URL, and detected axes.
 
 **Step 2 — Verify calibration**
-App proposes tick values from the global OCR pass. The researcher can edit any misread tick label and click **Confirm Calibration**.
+The right panel shows every detected tick with its OCR confidence. Editing a number updates Zustand locally. Clicking **Detect points** posts the corrected ticks to `/api/calibrate`, which refits the scale, runs Stage 3 (routing) and Stage 5 (transform), and returns the points plus the pixel→data affine matrix.
 
-**Step 3 — Review detections**
-Detected points are shown as an overlay on the figure, alongside the extracted data table.
+**Step 3 — Refine on the canvas**
+The Konva canvas now shows the original figure with one coloured marker per detected point (series-coloured). Wrong points can be:
+- **Dragged** to the correct pixel — the inverse affine recomputes (x, y) in data space, and the table row updates in lock-step.
+- **Deleted** with a right-click or double-click.
 
-**Step 4 — Export**
-One-click download as CSV, XLSX, or the overlay PNG. The same files are also persisted on disk under `tests/result/<image-stem>/`.
+**Step 4 — Refine in the data table**
+TanStack Table renders the same points; clicking an x or y cell opens an inline numeric editor (commits on Enter or blur). Editing a value through the affine forward map moves the corresponding marker on the canvas. Rows can be deleted individually, and an **Undo** button reverses the last change via the store's history stack.
+
+**Step 5 — Export**
+SheetJS produces the file in the browser:
+- **CSV** — `series, x, y, delta_x, delta_y`
+- **JSON** — `{ chart_type, points: [...] }`
+- **XLSX** — single `points` sheet
+
+No `/api/export` endpoint exists — exports are pure client-side, so step 5 is instantaneous and independent of backend state. Click **New image** to delete the session and start over.
 

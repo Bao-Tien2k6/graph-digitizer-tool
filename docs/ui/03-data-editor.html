@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>3 · Data Editor — PlotDigitizer UI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+  <h1 class="title">📊 PlotDigitizer</h1>
+  <p class="caption">Extract numerical data from scientific figures.</p>
+
+  <nav class="nav">
+    <a href="index.html">Overview</a>
+    <a href="01-upload.html">1 · Upload</a>
+    <a href="02-calibration.html">2 · Axis Calibration</a>
+    <a class="current" href="03-data-editor.html">3 · Data Editor</a>
+    <a href="04-results.html">4 · Results / Download</a>
+  </nav>
+
+  <div class="alert success">
+    Extracted 42 point(s) as <strong>scatter</strong>. Edit the tables on the
+    right, then click <em>Confirm &amp; Extract Data</em>.
+  </div>
+
+  <div class="cols">
+    <!-- LEFT COLUMN: companion overlay during editing -->
+    <section class="stack">
+      <div>
+        <div class="label">Upload scientific figure(s) (PNG, JPG)</div>
+        <div class="uploader">
+          <div><strong>experiment_A.png</strong> · 142 KB · <a href="#">✕</a></div>
+        </div>
+      </div>
+
+      <div class="label">Detected points</div>
+      <div class="preview tall" data-source="main.main (overlay companion)">
+        <span class="cap">Compare against the table on the right</span>
+      </div>
+      <div class="note">
+        While points are not yet confirmed, the overlay PNG written by Stage 5
+        is rendered here so the user can visually cross-check each row.
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: render_data_editor -->
+    <section data-source="ui_components.render_data_editor">
+      <h2 class="subheading">Step 3 — Verify Extracted Data</h2>
+      <p class="help">
+        Edit x / y values directly. Tick the 🗑 box to mark a wrong point for
+        removal, then click <em>Confirm &amp; Extract Data</em> to write the
+        final CSV.
+      </p>
+
+      <form data-interaction="data_editor_form">
+        <!-- One expander per series -->
+        <details class="expander" open data-interaction="editor_series_0">
+          <summary>Series 0</summary>
+          <div class="body">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th class="del">🗑</th>
+                  <th>x</th>
+                  <th>y</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="del"><input type="checkbox" /></td>
+                  <td><input type="number" value="0.0000" step="any" /></td>
+                  <td><input type="number" value="0.1230" step="any" /></td>
+                </tr>
+                <tr>
+                  <td class="del"><input type="checkbox" /></td>
+                  <td><input type="number" value="2.5000" step="any" /></td>
+                  <td><input type="number" value="0.4561" step="any" /></td>
+                </tr>
+                <tr>
+                  <td class="del"><input type="checkbox" checked /></td>
+                  <td><input type="number" value="5.0000" step="any" /></td>
+                  <td><input type="number" value="0.7890" step="any" /></td>
+                </tr>
+                <tr>
+                  <td class="del"><input type="checkbox" /></td>
+                  <td><input type="number" value="7.5000" step="any" /></td>
+                  <td><input type="number" value="0.8234" step="any" /></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="help">
+              Mapped back to the original <code>DataPoint</code>s by row index, so
+              column-header sort doesn't desync the row→point mapping
+              (see comment "FIX 1" in <code>render_data_editor</code>).
+            </div>
+          </div>
+        </details>
+
+        <details class="expander" open data-interaction="editor_series_1">
+          <summary>Series 1</summary>
+          <div class="body">
+            <table class="data">
+              <thead>
+                <tr><th class="del">🗑</th><th>x</th><th>y</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="del"><input type="checkbox" /></td>
+                  <td><input type="number" value="0.0000" step="any" /></td>
+                  <td><input type="number" value="0.0567" step="any" /></td>
+                </tr>
+                <tr>
+                  <td class="del"><input type="checkbox" /></td>
+                  <td><input type="number" value="2.5000" step="any" /></td>
+                  <td><input type="number" value="0.3120" step="any" /></td>
+                </tr>
+                <tr>
+                  <td class="del"><input type="checkbox" /></td>
+                  <td><input type="number" value="5.0000" step="any" /></td>
+                  <td><input type="number" value="0.6450" step="any" /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+
+        <!-- Form submit -> _run_export -->
+        <button class="primary full" type="submit"
+                data-interaction="confirm_extract"
+                data-source="ui_components.render_data_editor.form_submit_button">
+          ✅ Confirm &amp; Extract Data
+        </button>
+      </form>
+
+      <div class="note">
+        Submitting rebuilds the point list (skipping rows flagged for deletion
+        or with non-numeric x/y), then calls
+        <code>on_confirm</code> (<code>main._run_export</code>) which writes
+        <code>&lt;stem&gt;_final.csv</code> and refreshes the overlay PNG.
+      </div>
+    </section>
+  </div>
+</div>
+</body>
+</html>

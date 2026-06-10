@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>4 · Results &amp; Download — PlotDigitizer UI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+  <h1 class="title">📊 PlotDigitizer</h1>
+  <p class="caption">Extract numerical data from scientific figures.</p>
+
+  <nav class="nav">
+    <a href="index.html">Overview</a>
+    <a href="01-upload.html">1 · Upload</a>
+    <a href="02-calibration.html">2 · Axis Calibration</a>
+    <a href="03-data-editor.html">3 · Data Editor</a>
+    <a class="current" href="04-results.html">4 · Results / Download</a>
+  </nav>
+
+  <div class="alert success">
+    Saved 41 data point(s) to <code>tests/result/experiment_A</code>.
+  </div>
+
+  <div class="cols">
+    <!-- LEFT COLUMN: uploader summary + optional "Next image" -->
+    <section class="stack">
+      <div>
+        <div class="label">Upload scientific figure(s) (PNG, JPG)</div>
+        <div class="uploader">
+          <div><strong>experiment_A.png</strong> · 142 KB · <a href="#">✕</a></div>
+          <div><strong>experiment_B.png</strong> · 138 KB · <a href="#">✕</a></div>
+          <div><strong>experiment_C.png</strong> · 151 KB · <a href="#">✕</a></div>
+        </div>
+        <div class="help"><em>Image 1 of 3</em> — <code>experiment_A.png</code></div>
+      </div>
+
+      <!-- Batch advance button (only when more files remain) -->
+      <button class="primary full"
+              data-interaction="next_image"
+              data-source="main.main">
+        ➡️ Next image
+      </button>
+      <div class="note">
+        Shown only when the batch has more images. Increments
+        <code>queue_idx</code>, calls <code>_reset_image_state()</code>, then
+        <code>st.rerun()</code> — the next image starts at the upload stage.
+      </div>
+
+      <div class="alert info" style="margin-top:0.5rem;">
+        Alternative end-of-batch message:
+        <strong>All images in the batch have been processed.</strong>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: render_preview with final overlay -->
+    <section>
+      <div class="preview tall" data-source="ui_components.render_preview">
+        <span class="cap">Detection overlay (final)</span>
+      </div>
+      <div class="note">
+        After confirmation, the right column falls back to
+        <code>render_preview()</code> with the final overlay path; the data
+        editor is no longer rendered.
+      </div>
+    </section>
+  </div>
+
+  <hr class="sep" />
+
+  <!-- FULL-WIDTH FOOTER: render_download_buttons -->
+  <section data-source="ui_components.render_download_buttons">
+    <h2 class="subheading">Download Results</h2>
+    <div class="row">
+      <button class="full"
+              data-interaction="download_csv_final"
+              data-mime="text/csv">
+        📄 Final CSV
+      </button>
+      <button class="full"
+              data-interaction="download_overlay_png"
+              data-mime="image/png">
+        🖼️ Overlay PNG
+      </button>
+    </div>
+    <p class="caption" style="margin-top:1rem;">
+      📁 Saved to disk: <code>tests/result/experiment_A</code>
+    </p>
+    <div class="note">
+      The footer is rendered by <code>render_download_buttons</code> once
+      <code>points_confirmed</code> is True. One <code>st.download_button</code>
+      per entry of <code>TransformResult.output_paths</code>; the file path is
+      read from disk and streamed to the user.
+    </div>
+  </section>
+</div>
+</body>
+</html>

@@ -25,8 +25,7 @@ from pipeline.text_mask import build_text_mask
 # Module-level parameters
 N_SERIES_MAX           = 8
 HUE_BANDWIDTH_DEG      = 20
-MARKER_WIDTH_RATIO     = 1.6   
-MARKER_WIDTH_RATIO_MIN = 1.25  # Raised back to 1.25 to ignore line-aliasing thickness variations
+MARKER_WIDTH_RATIO     = 1.4   # Calibrate to catch genuine points
 MIN_MARKER_AREA_PX2    = 20
 MIN_HOLE_AREA_PX2      = 4     # Minimum size of an enclosed loop for hollow markers
 MAX_GAP_PX             = 15
@@ -368,10 +367,7 @@ def _extract_markers_from_skeleton(
     spike_mask = np.zeros_like(skel_u8)
 
     # 1. Width spikes ONLY
-    for ratio in (MARKER_WIDTH_RATIO, MARKER_WIDTH_RATIO_MIN):
-        spike_pixels = skel_pixels[widths > ratio * median_width]
-        if len(spike_pixels) > 0:
-            break
+    spike_pixels = skel_pixels[widths > MARKER_WIDTH_RATIO * median_width]
     for r, c in spike_pixels:
         spike_mask[r, c] = 1
 
@@ -513,43 +509,6 @@ def _renumber_series(markers: List[LineMarker]) -> None:
             counter += 1
         m.series_id = seen[m.series_id]
 
-# def _merge_interleaved_line_series(markers: List[LineMarker],
-#                                     smooth_tol_ratio: float = 0.25) -> None:
-#     """In-place: merge series_ids when two color groups sit on the same path."""
-#     if len(markers) < 4:
-#         return
-#     coords = np.array([[m.x_px, m.y_px] for m in markers])
-#     labels = np.array([m.series_id for m in markers])
-#     unique = sorted(set(labels.tolist()))
-#     changed = True
-#     while changed:
-#         changed = False
-#         for a in unique:
-#             for b in unique:
-#                 if a >= b:
-#                     continue
-#                 idx_a = np.where(labels == a)[0]
-#                 idx_b = np.where(labels == b)[0]
-#                 if len(idx_a) < 2 or len(idx_b) < 2:
-#                     continue
-#                 merged_idx = np.concatenate([idx_a, idx_b])
-#                 order = merged_idx[np.argsort(coords[merged_idx, 0])]
-#                 ys = coords[order, 1]
-#                 if len(ys) < 4:
-#                     continue
-#                 d2 = np.abs(np.diff(ys, n=2))
-#                 yrange = max(1.0, ys.max() - ys.min())
-#                 seq = labels[order]
-#                 flips = int(np.sum(seq[:-1] != seq[1:]))
-#                 if np.median(d2) <= smooth_tol_ratio * yrange and flips >= 2:
-#                     labels[labels == b] = a
-#                     changed = True
-#                     break
-#             if changed:
-#                 break
-#         unique = sorted(set(labels.tolist()))
-#     for m, lb in zip(markers, labels):
-#         m.series_id = int(lb)
 
 def _merge_interleaved_line_series(markers: List[LineMarker],
                                     smooth_tol_ratio: float = 0.25,

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>1 · Upload — PlotDigitizer UI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+  <h1 class="title">📊 PlotDigitizer</h1>
+  <p class="caption">Extract numerical data from scientific figures.</p>
+
+  <nav class="nav">
+    <a href="index.html">Overview</a>
+    <a class="current" href="01-upload.html">1 · Upload</a>
+    <a href="02-calibration.html">2 · Axis Calibration</a>
+    <a href="03-data-editor.html">3 · Data Editor</a>
+    <a href="04-results.html">4 · Results / Download</a>
+  </nav>
+
+  <div class="note">
+    Initial state. <code>main.main</code> renders the two-column layout. No image
+    is uploaded yet, so the right column shows nothing and the calibration step
+    is not rendered.
+  </div>
+
+  <div class="cols">
+    <!-- LEFT COLUMN ------------------------------------------------------- -->
+    <section class="stack">
+      <!-- File uploader (multi). Source: render_upload_widget -->
+      <div data-interaction="upload" data-source="ui_components.render_upload_widget">
+        <div class="label">Upload scientific figure(s) (PNG, JPG)</div>
+        <div class="uploader">
+          <div><strong>Drag and drop files here</strong></div>
+          <div class="help">Limit 200MB per file · PNG, JPG, JPEG</div>
+          <div class="browse">Browse files</div>
+        </div>
+        <div class="help">
+          Upload one or many charts. They are processed one at a time — verify
+          each calibration, extract, then move to the next. Multi-panel
+          figures: crop to a single panel first.
+        </div>
+      </div>
+
+      <div class="note">
+        On upload, <code>main._run_pipeline()</code> runs: load → preprocess →
+        global OCR (PaddleOCR, cached) → <code>detect_axes</code>. On success a
+        green alert shows and the calibration step replaces this empty area.
+      </div>
+
+      <!-- Example batch indicator (rendered only when files.length > 1) -->
+      <div data-interaction="batch_indicator">
+        <em>Image 1 of 3</em> — <code>experiment_A.png</code>
+        <div class="help">Shown when multiple files were uploaded.</div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN ------------------------------------------------------ -->
+    <section>
+      <div class="preview tall">
+        <span class="cap">Right column is empty until an image is uploaded.</span>
+      </div>
+      <div class="note">
+        After upload but before detection: <code>render_preview()</code> shows the
+        BGR→RGB image here. After detection: <code>render_data_editor()</code>
+        replaces it (see page 3).
+      </div>
+    </section>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PlotDigitizer — UI Mockup Index</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+  <h1 class="title">📊 PlotDigitizer — UI Mockups</h1>
+  <p class="caption">
+    Static HTML extraction of the Streamlit UI defined in
+    <code>main.py</code>, <code>app/ui_components.py</code>, and
+    <code>app/calibration.py</code>. Each page below mirrors one state of
+    the app and labels every interaction point.
+  </p>
+
+  <nav class="nav">
+    <a class="current" href="index.html">Overview</a>
+    <a href="01-upload.html">1 · Upload</a>
+    <a href="02-calibration.html">2 · Axis Calibration</a>
+    <a href="03-data-editor.html">3 · Data Editor</a>
+    <a href="04-results.html">4 · Results / Download</a>
+  </nav>
+
+  <h2 class="subheading">Top-level layout</h2>
+  <div class="note">
+    The app is a single-page Streamlit layout with a title row and a two-column
+    body (<code>st.columns([4, 6])</code>). State machine: <em>upload → calibrate →
+    detect → edit → confirm → download → next image</em>. Session keys are listed
+    at the bottom of this page.
+  </div>
+
+  <div class="cols">
+    <section>
+      <h3>Left column (40%)</h3>
+      <ul>
+        <li><strong>Upload widget</strong> — multi-file (<code>render_upload_widget</code>)</li>
+        <li><strong>Batch indicator</strong> — “Image N of M”</li>
+        <li><strong>Calibration step</strong> — axes overlay, tick editors, scale metrics, confirm button (<code>render_calibration_step</code>)</li>
+        <li><strong>Detection overlay preview</strong> — after Stage 3</li>
+        <li><strong>Next image</strong> button — batch advance</li>
+      </ul>
+    </section>
+    <section>
+      <h3>Right column (60%)</h3>
+      <ul>
+        <li><strong>Image preview</strong> before detection (<code>render_preview</code>)</li>
+        <li><strong>Data editor</strong> after detection — one expander per series, editable x/y, delete checkbox, Confirm button (<code>render_data_editor</code>)</li>
+        <li><strong>Final overlay</strong> after confirmation</li>
+      </ul>
+    </section>
+  </div>
+
+  <h2 class="subheading">Full-width footer</h2>
+  <ul>
+    <li><strong>Download Results</strong> — Final CSV + Overlay PNG (<code>render_download_buttons</code>)</li>
+    <li><strong>Saved-to-disk caption</strong> — shows <code>result_dir</code></li>
+  </ul>
+
+  <hr class="sep" />
+
+  <h2 class="subheading">Interaction points (consolidated)</h2>
+  <table class="data">
+    <thead>
+      <tr><th>ID</th><th>Widget</th><th>Triggers</th><th>Defined in</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>upload</td><td>File uploader (multi)</td><td>Re-init batch queue, run pipeline on first image</td><td>ui_components.render_upload_widget</td></tr>
+      <tr><td>tick_X_i / tick_Y_i</td><td>Number input per detected tick</td><td>Mutates <code>tk.label_value</code></td><td>calibration._render_tick_editor</td></tr>
+      <tr><td>confirm_axes</td><td>“✅ Confirm Extracted Axis Ticks”</td><td>Sets <code>calibration_done=True</code>, runs Stage 3</td><td>calibration.render_calibration_step</td></tr>
+      <tr><td>editor_series_{sid}</td><td><code>st.data_editor</code> per series</td><td>Edits x/y, marks rows for deletion</td><td>ui_components.render_data_editor</td></tr>
+      <tr><td>confirm_extract</td><td>“✅ Confirm &amp; Extract Data” (form submit)</td><td>Rebuilds points, writes final CSV + overlay</td><td>ui_components.render_data_editor</td></tr>
+      <tr><td>next_image</td><td>“➡️ Next image”</td><td>Increments <code>queue_idx</code>, resets image state</td><td>main.main</td></tr>
+      <tr><td>download_csv_final</td><td>Download button</td><td>Streams the final CSV file</td><td>ui_components.render_download_buttons</td></tr>
+      <tr><td>download_overlay_png</td><td>Download button</td><td>Streams the overlay PNG</td><td>ui_components.render_download_buttons</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="subheading">Session state keys</h2>
+  <ul>
+    <li><code>uploaded_img</code> — current BGR image (np.ndarray)</li>
+    <li><code>axes_info</code> — Stage 2 output, mutated by tick editor</li>
+    <li><code>global_ocr_results</code> — cached PaddleOCR output</li>
+    <li><code>routing_result</code> — Stage 3 chart-type routing</li>
+    <li><code>transform_result</code> — Stage 5 points + overlay paths</li>
+    <li><code>calibration_done</code>, <code>points_confirmed</code> — step flags</li>
+    <li><code>queue_keys</code>, <code>queue_idx</code>, <code>processed_key</code> — batch queue state</li>
+    <li><code>upload_name</code>, <code>result_dir</code> — output naming</li>
+    <li><code>tick_X_i</code>, <code>tick_Y_i</code>, <code>editor_series_{sid}</code> — widget keys</li>
+  </ul>
+
+  <div class="legend">
+    <h3>Legend</h3>
+    <ul>
+      <li>Hatched grey blocks = image preview area (Streamlit <code>st.image</code>).</li>
+      <li>Red buttons = <code>type="primary"</code> in Streamlit.</li>
+      <li>Blue notes = explanatory annotations, not part of the rendered UI.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

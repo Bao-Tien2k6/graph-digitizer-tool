@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>2 · Axis Calibration — PlotDigitizer UI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+  <h1 class="title">📊 PlotDigitizer</h1>
+  <p class="caption">Extract numerical data from scientific figures.</p>
+
+  <nav class="nav">
+    <a href="index.html">Overview</a>
+    <a href="01-upload.html">1 · Upload</a>
+    <a class="current" href="02-calibration.html">2 · Axis Calibration</a>
+    <a href="03-data-editor.html">3 · Data Editor</a>
+    <a href="04-results.html">4 · Results / Download</a>
+  </nav>
+
+  <div class="alert success">Axes detected — please verify the calibration below.</div>
+
+  <div class="cols">
+    <!-- LEFT COLUMN: render_calibration_step -->
+    <section class="stack" data-source="calibration.render_calibration_step">
+      <!-- Compact reminder of the uploader -->
+      <div>
+        <div class="label">Upload scientific figure(s) (PNG, JPG)</div>
+        <div class="uploader">
+          <div><strong>experiment_A.png</strong> · 142 KB · <a href="#">✕</a></div>
+        </div>
+      </div>
+
+      <h2 class="subheading">Step 2 — Verify Axis Calibration</h2>
+      <p class="help">
+        Review the automatically detected tick values. If OCR misread a label,
+        correct it below before extracting.
+      </p>
+
+      <!-- Axes overlay image. Source: _render_axes_overlay -->
+      <div class="preview" data-source="calibration._render_axes_overlay">
+        <span class="cap">Detected axes (green) and ticks (orange)</span>
+      </div>
+
+      <!-- X-axis tick editor -->
+      <details class="expander" open data-interaction="tick_editor_x"
+               data-source="calibration._render_tick_editor">
+        <summary>X-axis ticks</summary>
+        <div class="body stack">
+          <div class="tick-row">
+            <div>
+              <div class="label">🟢 Tick at pixel 120 (OCR: '0', conf=0.98)</div>
+              <input class="number" type="number" value="0" step="any"
+                     data-key="tick_X_0" />
+            </div>
+            <div>
+              <div class="help">px 120</div>
+            </div>
+          </div>
+          <div class="tick-row">
+            <div>
+              <div class="label">🟢 Tick at pixel 260 (OCR: '10', conf=0.95)</div>
+              <input class="number" type="number" value="10" step="any"
+                     data-key="tick_X_1" />
+            </div>
+            <div><div class="help">px 260</div></div>
+          </div>
+          <div class="tick-row">
+            <div>
+              <div class="label">🔴 Tick at pixel 400 (OCR: 'Z0', conf=0.42)</div>
+              <input class="number" type="number" value="20" step="any"
+                     data-key="tick_X_2" />
+            </div>
+            <div><div class="help">px 400</div></div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Y-axis tick editor -->
+      <details class="expander" open data-interaction="tick_editor_y">
+        <summary>Y-axis ticks</summary>
+        <div class="body stack">
+          <div class="tick-row">
+            <div>
+              <div class="label">🟢 Tick at pixel 540 (OCR: '0', conf=0.97)</div>
+              <input class="number" type="number" value="0" step="any"
+                     data-key="tick_Y_0" />
+            </div>
+            <div><div class="help">px 540</div></div>
+          </div>
+          <div class="tick-row">
+            <div>
+              <div class="label">🟢 Tick at pixel 380 (OCR: '0.5', conf=0.93)</div>
+              <input class="number" type="number" value="0.5" step="any"
+                     data-key="tick_Y_1" />
+            </div>
+            <div><div class="help">px 380</div></div>
+          </div>
+          <div class="tick-row">
+            <div>
+              <div class="label">🟢 Tick at pixel 220 (OCR: '1.0', conf=0.91)</div>
+              <input class="number" type="number" value="1.0" step="any"
+                     data-key="tick_Y_2" />
+            </div>
+            <div><div class="help">px 220</div></div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Scale metrics -->
+      <div class="row">
+        <div class="metric">
+          <div class="m-label">X-axis scale</div>
+          <div class="m-value">linear</div>
+          <div class="m-delta">R²=0.9998</div>
+        </div>
+        <div class="metric">
+          <div class="m-label">Y-axis scale</div>
+          <div class="m-value">linear</div>
+          <div class="m-delta">R²=0.9994</div>
+        </div>
+      </div>
+
+      <!-- Confirm button -> on_confirm -> main._run_detection -->
+      <button class="primary full"
+              data-interaction="confirm_axes"
+              data-source="calibration.render_calibration_step">
+        ✅ Confirm Extracted Axis Ticks
+      </button>
+      <div class="note">
+        Clicking this sets <code>st.session_state.calibration_done = True</code>,
+        invokes the <code>on_confirm</code> callback
+        (<code>main._run_detection</code>) which runs Stage 3 routing + the
+        pixel→data transform, then calls <code>st.rerun()</code>.
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: render_preview while calibration is in progress -->
+    <section>
+      <div class="preview tall" data-source="ui_components.render_preview">
+        <span class="cap">Uploaded figure (BGR→RGB)</span>
+      </div>
+    </section>
+  </div>
+</div>
+</body>
+</html>
