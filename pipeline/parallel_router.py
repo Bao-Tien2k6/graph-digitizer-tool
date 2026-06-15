@@ -121,16 +121,6 @@ def _select_winner(results: Dict[str, DetectionResult]) -> RoutingResult:
     winner = sorted_results[0]
     second = sorted_results[1] if len(sorted_results) > 1 else None
 
-    # If line_detector is the winner but its confidence is low, fall back to scatter.
-    # if (winner.chart_type == "line"
-    #         and winner.confidence <= 0.5
-    #         and "scatter" in results
-    #         and len(results["scatter"].pixel_points) > 0):
-    #     log.info("Line confidence %.3f <= 0.5; falling back to scatter "
-    #              "(n_scatter=%d)", winner.confidence,
-    #              len(results["scatter"].pixel_points))
-    #     winner = results["scatter"]
-    #     second = results["line"]
     if (winner.chart_type == "line"
             and "scatter" in results
             and results["scatter"].confidence > winner.confidence
