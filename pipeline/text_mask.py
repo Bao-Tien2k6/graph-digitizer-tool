@@ -20,12 +20,12 @@ import numpy as np
 from pipeline.preprocess import BGRImage
 
 # Tunables
-OCR_MIN_CONF       = 0.40   
+OCR_MIN_CONF       = 0.7  
 TEXT_DILATE_PX     = 1 
 SAT_TEXT_MAX       = 120
 
 # o-vs-marker disambiguation
-AMBIGUOUS_GLYPHS   = set("oO0QDc")          # single-char tokens needing a check
+AMBIGUOUS_GLYPHS   = set("oO0QDcC")    
 NEIGHBOR_DX_FACTOR = 2.0       # horizontal search radius (in glyph widths)
 NEIGHBOR_DY_FACTOR = 1.0       # vertical search radius (in glyph heights)
 PUNCT_CHARS        = set("().,[]|:;-_=+/\\'\"")

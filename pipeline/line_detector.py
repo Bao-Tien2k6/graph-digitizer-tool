@@ -27,7 +27,6 @@ N_SERIES_MAX           = 8
 HUE_BANDWIDTH_DEG      = 20
 MARKER_WIDTH_RATIO     = 1.4   # Calibrate to catch genuine points
 MIN_MARKER_AREA_PX2    = 20
-MIN_HOLE_AREA_PX2      = 4     # Minimum size of an enclosed loop for hollow markers
 MAX_GAP_PX             = 15
 CONFIDENCE_SATURATION  = 5000
 BOUNDING_THICKNESS = 20
@@ -63,8 +62,6 @@ def detect(img: BGRImage, axes: AxesInfo, text_mask: np.ndarray = None) -> Detec
     roi[text_mask_roi > 0] = 255
     
     # --- NEW: Mask out the plot frame bounding box so ticks/lines aren't detected ---
-    # h, w = roi.shape[:2]
-    # cv2.rectangle(roi, (0, 0), (w-1, h-1), (255, 255, 255), thickness=BOUNDING_THICKNESS)
     h, w = roi.shape[:2]
     t = BOUNDING_THICKNESS
     half = t // 2
@@ -77,38 +74,52 @@ def detect(img: BGRImage, axes: AxesInfo, text_mask: np.ndarray = None) -> Detec
                                detector_meta={"n_markers": 0, "n_series": 0,
                                               "total_skeleton_px": 0})
 
+    roi_w = roi.shape[1]
+
+    # --- Step 1: count how many distinct plotted lines are present ---
+    # A "line" mask is one whose skeleton has a horizontally long component (a
+    # genuine curve spanning the plot). Marker masks are excluded: their only
+    # long skeletons are vertical error bars, which fail the horizontal-span
+    # test. >=2 such masks => the figure has multiple lines.
+    n_lines = sum(1 for m in color_masks if _is_line_mask(m, roi_w))
+    n_lines = max(1, n_lines)
+
     all_markers: List[LineMarker] = []
     total_skel_px = 0
     connected_skel_px = 0
+    method = "branch_ab"
 
-    for series_id, mask in enumerate(color_masks):
-        if _is_continuous_line(mask):
-            # Branch A: skeletonize + width-spike marker extraction
-            skel = _skeletonize_mask(mask)
-            skel_bridged, gap_px = _bridge_gaps(skel)
-
-            markers = _extract_markers_from_skeleton(skel_bridged, mask, series_id)
-            
-            # # Extract line endpoints (fixes beginning/ending squares) ---
-            # endpoints = _extract_endpoints_from_skeleton(skel_bridged, mask, series_id)
-            # markers.extend(endpoints)
-
-            # Add hollow markers (enclosed loops missed by width-spike detection)
-            hollow_markers = _detect_hollow_markers(mask, series_id)
-            markers.extend(hollow_markers)
-
-            sk_sum = int(skel_bridged.sum())
-            total_skel_px += sk_sum
-            connected_skel_px += max(0, sk_sum - gap_px)
+    # --- Step 2: extract points ---
+    # Case 1 (single line) with a dedicated marker-color mask: when the markers
+    # are a different color from the line, color_masks holds the line, the
+    # markers, and (often) a frame remnant separately (len >= 3). The markers
+    # then live in their own mask as clean blobs, so detect them directly
+    # instead of relying on width spikes. color_masks[1] is the second-most-
+    # common color, i.e. the markers when the line is the dominant color.
+    use_marker_mask = (n_lines == 1 and len(color_masks) >= 3)
+    if use_marker_mask:
+        marker_mask = color_masks[1]
+        markers = _detect_marker_blobs_dt(marker_mask, series_id=0)
+        if len(markers) >= 2:
+            method = "marker_mask"
+            all_markers.extend(markers)
+            # Confidence comes from the real line skeleton (the line mask is
+            # still present and strong), not the marker count -- otherwise this
+            # path would under-score and the router would discard the line.
+            line_skel_px = sum(
+                int(skeletonize(m.astype(bool)).sum())
+                for m in color_masks if _is_line_mask(m, roi_w)
+            )
+            total_skel_px += line_skel_px
+            connected_skel_px += line_skel_px
         else:
-            # Branch B: isolated blobs → direct centroid detection
-            markers = _detect_isolated_blobs(mask, series_id)
-            # Approximate skeleton contribution for confidence scoring
-            approx_skel = len(markers) * 15
-            total_skel_px += approx_skel
-            connected_skel_px += approx_skel
+            use_marker_mask = False  # too few points; fall back to A/B
 
-        all_markers.extend(markers)
+    # Case 1 (same-color markers, len <= 2) and Case 2 (multiple lines):
+    # keep the original two-branch (A/B) extraction.
+    if not use_marker_mask:
+        all_markers, total_skel_px, connected_skel_px = \
+            _detect_markers_branch_ab(color_masks)
 
     # Deduplicate markers that are spatially very close (< 15 px)
     all_markers = _deduplicate_markers(all_markers, threshold_px=15)
@@ -141,47 +152,102 @@ def detect(img: BGRImage, axes: AxesInfo, text_mask: np.ndarray = None) -> Detec
         detector_meta={
             "n_markers": len(all_markers),
             "n_series": len(color_masks),
+            "n_lines": n_lines,
+            "method": method,
             "total_skeleton_px": total_skel_px,
         },
     )
 
-def _detect_hollow_markers(color_mask: np.ndarray, series_id: int) -> List[LineMarker]:
-    """Find enclosed loops (hollow markers) in the mask filter Hollow Markers via circularity and inertia"."""
-    hollow_markers = []
-    
-    # RETR_CCOMP extracts internal holes as child contours
-    contours, hierarchy = cv2.findContours(color_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-    if hierarchy is None:
-        return hollow_markers
-        
-    for i, cnt in enumerate(contours):
-        # hierarchy[0][i][3] holds the parent ID. If it's not -1, this contour is a hole!
-        if hierarchy[0][i][3] != -1:
-            area = cv2.contourArea(cnt)
-            if area >= MIN_HOLE_AREA_PX2:
-                # --- NEW: Filter out jagged JPEG artifacts using circularity and aspect ratio ---
-                perim = cv2.arcLength(cnt, True)
-                if perim == 0:
-                    continue
-                circularity = 4 * np.pi * (area / (perim * perim))
-                
-                x, y, w, h = cv2.boundingRect(cnt)
-                aspect_ratio = float(w) / max(h, 1)
-                
-                # Real markers have holes that are relatively round or square (aspect ratio ~1.0)
-                # Artifacts are usually jagged slivers (low circularity, extreme aspect ratios)
-                if circularity > 0.75 and 0.4 <= aspect_ratio <= 2.5:
-                    M = cv2.moments(cnt)
-                    if M["m00"] != 0:
-                        cx = float(M["m10"] / M["m00"])
-                        cy = float(M["m01"] / M["m00"])
-                        hollow_markers.append(LineMarker(
-                            x_px=cx, y_px=cy,
-                            series_id=series_id,
-                            blob_area_px2=area * 3, # Rough estimate of the outer marker area
-                        ))
-    return hollow_markers
+def _is_line_mask(mask: np.ndarray, roi_width: int,
+                  min_span_ratio: float = 0.25) -> bool:
+    """True if the mask contains a genuine plotted curve.
 
+    Unlike `_is_continuous_line`, this requires a skeleton component to span a
+    large *horizontal* extent (>= ``min_span_ratio`` of the ROI width), so a
+    marker mask whose only long skeletons are vertical error bars is NOT
+    counted as a line.
+    """
+    skel = skeletonize(mask.astype(bool)).astype(np.uint8)
+    n_labels, _labels, stats, _cent = cv2.connectedComponentsWithStats(skel)
+    if n_labels <= 1:
+        return False
+    for i in range(1, n_labels):
+        if stats[i, cv2.CC_STAT_AREA] < CONTINUOUS_LINE_MIN_PX:
+            continue
+        span = stats[i, cv2.CC_STAT_WIDTH]
+        if span >= min_span_ratio * roi_width:
+            return True
+    return False
+
+
+def _detect_marker_blobs_dt(mask: np.ndarray, series_id: int,
+                            min_area: float = MIN_MARKER_AREA_PX2) -> List[LineMarker]:
+    """Detect markers from a dedicated marker-color mask.
+
+    Each white connected component is one marker. The center is taken at the
+    distance-transform peak (the center of the largest inscribed circle) rather
+    than the centroid, so a marker fused with its error-bar whisker/caps is
+    still located on the round marker body instead of being pulled toward the
+    whisker.
+    """
+    mask_u8 = (mask > 0).astype(np.uint8)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    opened = cv2.morphologyEx(mask_u8, cv2.MORPH_OPEN, kernel)
+
+    n_labels, labels, stats, _cent = cv2.connectedComponentsWithStats(opened)
+    markers: List[LineMarker] = []
+    for i in range(1, n_labels):
+        area = float(stats[i, cv2.CC_STAT_AREA])
+        if area < min_area:
+            continue
+        comp = (labels == i).astype(np.uint8)
+        dist = cv2.distanceTransform(comp, cv2.DIST_L2, 5)
+        _minv, _maxv, _minloc, maxloc = cv2.minMaxLoc(dist)
+        cx, cy = float(maxloc[0]), float(maxloc[1])
+        markers.append(LineMarker(
+            x_px=cx, y_px=cy,
+            series_id=series_id,
+            blob_area_px2=area,
+        ))
+
+    markers.sort(key=lambda m: m.x_px)
+    for idx, m in enumerate(markers):
+        m.skeleton_arc_length = float(idx)
+    return markers
+
+
+def _detect_markers_branch_ab(
+    color_masks: List[np.ndarray],
+) -> Tuple[List[LineMarker], int, int]:
+    """Original two-branch extraction (preserved as the fallback path).
+
+    Branch A — continuous-line masks: skeleton + width-spike markers.
+    Branch B — isolated-color masks: direct blob centroids.
+    Returns (markers, total_skeleton_px, connected_skeleton_px).
+    """
+    all_markers: List[LineMarker] = []
+    total_skel_px = 0
+    connected_skel_px = 0
+
+    for series_id, mask in enumerate(color_masks):
+        if _is_continuous_line(mask):
+            skel = _skeletonize_mask(mask)
+            skel_bridged, gap_px = _bridge_gaps(skel)
+
+            markers = _extract_markers_from_skeleton(skel_bridged, mask, series_id)
+
+            sk_sum = int(skel_bridged.sum())
+            total_skel_px += sk_sum
+            connected_skel_px += max(0, sk_sum - gap_px)
+        else:
+            markers = _detect_isolated_blobs(mask, series_id)
+            approx_skel = len(markers) * 15
+            total_skel_px += approx_skel
+            connected_skel_px += approx_skel
+
+        all_markers.extend(markers)
+
+    return all_markers, total_skel_px, connected_skel_px
 
 def _segment_by_color(roi: BGRImage) -> List[np.ndarray]:
     """
@@ -379,13 +445,25 @@ def _extract_markers_from_skeleton(
     markers: List[LineMarker] = []
     for i in range(1, n_labels):
         area = float(stats[i, cv2.CC_STAT_AREA])
-        if area >= MIN_MARKER_AREA_PX2:
-            cx, cy = float(centroids[i][0]), float(centroids[i][1])
-            markers.append(LineMarker(
-                x_px=cx, y_px=cy,
-                series_id=series_id,
-                blob_area_px2=area,
-            ))
+        if area < MIN_MARKER_AREA_PX2:
+            continue
+
+        # Reject line-strip false positives. A genuine marker is roughly
+        # circular/square (aspect ~ 1); a stretch of line wrongly flagged as a
+        # spike is a long, thin strip (e.g. 148 x 8 px, aspect 18.5). Catches
+        # image 41's flat-segment fakes without touching real markers.
+        bw = float(stats[i, cv2.CC_STAT_WIDTH])
+        bh = float(stats[i, cv2.CC_STAT_HEIGHT])
+        aspect = max(bw, bh) / max(1.0, min(bw, bh))
+        if bw/bh > 2.5:
+            continue
+
+        cx, cy = float(centroids[i][0]), float(centroids[i][1])
+        markers.append(LineMarker(
+            x_px=cx, y_px=cy,
+            series_id=series_id,
+            blob_area_px2=area,
+        ))
 
     markers.sort(key=lambda m: m.x_px)
     for i, m in enumerate(markers):
