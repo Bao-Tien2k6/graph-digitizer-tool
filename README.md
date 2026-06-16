@@ -393,31 +393,3 @@ print(f"Extracted {len(result.points)} points → {result.output_paths}")
 ```bash
 deactivate
 ```
-
----
-
-## Deployment Options
-
-| Option | Command / Notes |
-|---|---|
-| **Local (dev)** | `uvicorn api.main:app --reload --port 8000` + `cd frontend && npm run dev` — Vite proxies `/api/*` to the backend. |
-| **Local (single port)** | `cd frontend && npm run build` produces `frontend/dist/`. Serve those static assets from FastAPI (or any static host) and point the frontend at the backend's origin. |
-| **Custom server** | Any host with Python 3.10+ and Node 18+. Run uvicorn behind a reverse proxy (nginx / Caddy); serve `frontend/dist/` as static files; route `/api/*` to uvicorn. |
-
-> Docker images and GitHub Actions CI/CD are planned (M7) but not yet present in
-> the repo.
-
----
-
-## Development Milestones
-
-| Milestone | Deliverable | Status |
-|---|---|---|
-| **M1** — Axes pipeline | Hough + PaddleOCR axes detection, affine transform, CSV output | ✅ |
-| **M2** — Bar detector | Contour-based bar top detection; error-bar / whisker handling | 🟡 |
-| **M3** — Scatter detector | Blob/contour marker detection; colour-based series separation | ✅ |
-| **M4** — Line detector | Skeleton tracing + marker isolation; dashed-line handling | ✅ |
-| **M5** — Routing | Confidence scoring + mixed-chart detection (parallel execution pending) | 🟡 |
-| **M6** — Streamlit MVP | Calibration UI + batch upload + overlay preview (superseded by M6.5) | ✅ |
-| **M6.5** — FastAPI + React rewrite | Konva drag-to-edit canvas, TanStack inline editing, Zustand state, SheetJS export — all client-side after `/api/calibrate` | ✅ |
-| **M7** — GitHub deploy | CI/CD, Docker, executable builds | ⬜ |
