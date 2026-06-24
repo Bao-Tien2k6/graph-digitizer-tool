@@ -4,10 +4,18 @@ Exposes the existing pipeline (preprocess → OCR → axes → router → transf
 as JSON endpoints. The frontend (Vite + React) owns all interactive editing —
 once /calibrate returns the affine matrix and points, dragging, deleting, and
 exporting happen entirely client-side.
+
+IMPORTANT — single-process only: session state (decoded images + detection
+results) lives in the in-process ``SESSIONS`` dict. Run with ONE worker
+(``uvicorn api.main:app`` without ``--workers``). Under multiple workers a
+``/calibrate`` request can land on a worker that never handled the matching
+``/digitize`` and will 404. Use an external store (Redis / disk) before
+scaling out.
 """
 
 from __future__ import annotations
 
+import asyncio
 import io
 import time
 import uuid
@@ -42,6 +50,10 @@ from pipeline.parallel_router import RoutingResult, route
 from pipeline.preprocess import load_image_from_bytes, preprocess_image
 
 SESSION_TTL_SECONDS = 30 * 60
+MAX_SESSIONS = 64               # hard cap; oldest are evicted past this
+SWEEP_INTERVAL_SECONDS = 5 * 60  # background reclaim cadence
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # reject uploads larger than 25 MB
+ALLOWED_UPLOAD_TYPES = {"image/png", "image/jpeg", "image/jpg"}
 
 
 @dataclass
@@ -69,6 +81,13 @@ def _sweep() -> None:
         SESSIONS.pop(sid, None)
 
 
+def _evict_if_full() -> None:
+    """Bound memory: drop the least-recently-accessed sessions past the cap."""
+    while len(SESSIONS) >= MAX_SESSIONS:
+        oldest = min(SESSIONS, key=lambda sid: SESSIONS[sid].last_accessed)
+        SESSIONS.pop(oldest, None)
+
+
 def _get_session(session_id: str) -> SessionState:
     _sweep()
     session = SESSIONS.get(session_id)
@@ -78,12 +97,23 @@ def _get_session(session_id: str) -> SessionState:
     return session
 
 
+async def _periodic_sweep() -> None:
+    """Reclaim expired sessions even while the server is idle (no traffic)."""
+    while True:
+        await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
+        _sweep()
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     global _OCR_ENGINE
     _OCR_ENGINE = PaddleOCR(use_angle_cls=True, lang="en")
-    yield
-    SESSIONS.clear()
+    sweeper = asyncio.create_task(_periodic_sweep())
+    try:
+        yield
+    finally:
+        sweeper.cancel()
+        SESSIONS.clear()
 
 
 app = FastAPI(title="PlotDigitizer API", lifespan=lifespan)
@@ -152,9 +182,22 @@ def healthz() -> HealthResponse:
 @app.post("/api/digitize", response_model=DigitizeResponse)
 async def digitize(image: UploadFile = File(...)) -> DigitizeResponse:
     _sweep()
-    raw = await image.read()
+
+    # Don't trust the client: validate content type and bound the read so a
+    # huge or malicious upload cannot OOM the worker.
+    if image.content_type not in ALLOWED_UPLOAD_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported type {image.content_type!r}; expected PNG or JPEG",
+        )
+    raw = await image.read(MAX_UPLOAD_BYTES + 1)
     if not raw:
         raise HTTPException(status_code=400, detail="Empty upload")
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit",
+        )
 
     try:
         img = load_image_from_bytes(raw)
@@ -164,6 +207,9 @@ async def digitize(image: UploadFile = File(...)) -> DigitizeResponse:
 
     assert _OCR_ENGINE is not None, "OCR engine not initialized"
     try:
+        # PaddleOCR 2.x .ocr() returns a list-per-image; index [0] is this
+        # single image's lines. Each line is [bbox, (text, conf)] — the shape
+        # the axes detector and text-mask builder downstream rely on.
         raw_ocr = _OCR_ENGINE.ocr(img, cls=True)
         global_ocr = raw_ocr[0] if raw_ocr and raw_ocr[0] else []
     except Exception as exc:
@@ -174,6 +220,7 @@ async def digitize(image: UploadFile = File(...)) -> DigitizeResponse:
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Axes detection failed: {exc}") from exc
 
+    _evict_if_full()
     session_id = uuid.uuid4().hex
     SESSIONS[session_id] = SessionState(
         image=img,
