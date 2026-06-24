@@ -30,7 +30,11 @@ BLOB_MIN_INERTIA      = 0.20
 N_SERIES_MAX          = 8
 MIN_SEPARATION_PX     = 5
 MIN_SERIES_SIZE       = 3       # drop color clusters with fewer
-CONFIDENCE_SATURATION = 200
+# Blob count at which "this is a scatter plot" confidence saturates to 1.0.
+# Set to 333 so confidence == n / 333: this preserves the previous routing
+# behavior, where confidence was n * 0.6 / 200 (the 0.6 was a constant,
+# fabricated per-point circularity that has since been removed).
+CONFIDENCE_SATURATION = 333
 
 
 
@@ -126,12 +130,13 @@ def _detect_blobs(roi: BGRImage) -> List[ScatterPoint]:
         x, y = kp.pt
         r = kp.size / 2.0
         area = np.pi * r * r
-        # Compute circularity from a circle approximation
-        circ = min(1.0, BLOB_MIN_CIRCULARITY + 0.2)  # approximate
+        # These keypoints already passed SimpleBlobDetector's circularity
+        # filter (>= BLOB_MIN_CIRCULARITY), so we leave circularity at its
+        # default rather than inventing a per-point value. Downstream dedup
+        # and confidence use blob area / count, not this field.
         points.append(ScatterPoint(
             x_px=float(x), y_px=float(y),
             blob_area_px2=float(area),
-            circularity=circ,
         ))
 
     # Also use contour-based detection for colored markers
@@ -189,8 +194,10 @@ def _deduplicate(points: List[ScatterPoint]) -> List[ScatterPoint]:
             continue
         dists = np.hypot(coords[:, 0] - coords[i, 0], coords[:, 1] - coords[i, 1])
         nearby = np.where((dists < MIN_SEPARATION_PX) & (~used))[0]
-        # Keep the one with highest circularity
-        best = max(nearby, key=lambda j: points[j].circularity)
+        # Keep the largest blob. Area is measured for both the keypoint and the
+        # colored-contour detection paths, so it is an unbiased tiebreaker —
+        # unlike circularity, which was only genuinely computed for one path.
+        best = max(nearby, key=lambda j: points[j].blob_area_px2)
         kept.append(points[best])
         used[nearby] = True
     return kept
@@ -315,8 +322,7 @@ def _merge_interleaved_series(points: List[ScatterPoint],
 
 
 def _compute_confidence(points: List[ScatterPoint]) -> float:
+    """Confidence that this figure is a scatter plot, from detected blob count."""
     if not points:
         return 0.0
-    mean_circ = np.mean([p.circularity for p in points])
-    raw = len(points) * mean_circ
-    return float(min(raw / CONFIDENCE_SATURATION, 1.0))
+    return float(min(len(points) / CONFIDENCE_SATURATION, 1.0))
