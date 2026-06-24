@@ -3,8 +3,15 @@ pipeline/axes_detector.py
 =========================
 Stage 2 — Axes & Scale Detection
 
-OCR-first approach: Run EasyOCR on the label regions to get both
-the numeric values AND their pixel positions (label center coordinates).
+OCR-first approach: reuse the global PaddleOCR pass (run once at the API layer)
+to get both the numeric values AND their pixel positions (label center
+coordinates).
+
+Expected `global_ocr_results` shape (PaddleOCR per-line format):
+    [ [ [[x,y],...4 box pts...], (text, confidence) ], ... ]
+i.e. ``line[0]`` is the 4-point bbox, ``line[1][0]`` the text, ``line[1][1]``
+the confidence. If PaddleOCR's output format changes across versions, the
+filters in ``_ocr_axis_region`` silently yield no ticks — guard there first.
 """
 
 from __future__ import annotations
@@ -55,8 +62,10 @@ class AxesInfo:
     inpainted_image: Optional[BGRImage] = None
 
 # Main entry point
-def detect_axes(img: BGRImage, global_ocr_results: list = None) -> AxesInfo:
+def detect_axes(img: BGRImage, global_ocr_results: Optional[list] = None) -> AxesInfo:
     """Full axes detection pipeline for one figure."""
+    if global_ocr_results is None:
+        global_ocr_results = []
     grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     x_line, y_line = _locate_axis_lines(grey)
