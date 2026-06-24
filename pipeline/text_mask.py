@@ -6,11 +6,15 @@ bounded by the detected x- and y-axes) so that detectors can exclude legend /
 annotation pixels before blob detection.
 
 Method:
-  1. Run EasyOCR on the plot-region ROI only.
+  1. Reuse the global PaddleOCR pass (filtered to boxes intersecting the
+     plot region) — no separate OCR call is made here.
   2. Every multi-character OCR token -> mask its bbox.
   3. Single-char tokens that look like 'o' / 'O' / '0' / 'Q' / 'D' get an
      extra disambiguation step so we don't accidentally mask open-circle
      data markers as text.
+
+`global_ocr_results` uses the PaddleOCR per-line format: ``line[0]`` is the
+4-point bbox, ``line[1][0]`` the text, ``line[1][1]`` the confidence.
 """
 from __future__ import annotations
 from typing import List, Tuple
