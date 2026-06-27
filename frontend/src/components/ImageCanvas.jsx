@@ -135,7 +135,11 @@ export default function ImageCanvas() {
           x={stagePos.x}
           y={stagePos.y}
           draggable
-          onDragEnd={(e) => setStagePos({ x: e.target.x(), y: e.target.y() })}
+          onDragEnd={(e) => {
+            if (e.target == e.target.getStage()) {
+              setStagePos({x: e.target.x(), y: e.target.y()})}
+            }
+          }
           onWheel={handleWheel}
           onMouseDown={(e) => {
             // Click on empty stage clears selection.
