@@ -62,6 +62,49 @@ function EditableNumberCell({ value, onCommit }) {
   );
 }
 
+function EditableIntegerCell({ value, onCommit }) {
+  const [draft, setDraft] = useState(String(value ?? 0));
+  const [editing, setEditing] = useState(false);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="w-full text-left px-2 py-1 hover:bg-accent rounded font-medium"
+        onClick={() => {
+          setDraft(String(value ?? 0));
+          setEditing(true);
+        }}
+      >
+        {value}
+      </button>
+    );
+  }
+
+  const commit = () => {
+    const n = parseInt(draft, 10);
+    if (Number.isFinite(n) && n >= 0) onCommit(n);
+    setEditing(false);
+  };
+
+  return (
+    <Input
+      type="number"
+      step="1"
+      min="0"
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') setEditing(false);
+      }}
+      className="h-8 w-16 text-sm"
+    />
+  );
+}
+
 export default function DataTable() {
   const points = useDigitizerStore((s) => s.points);
   const selectedPointId = useDigitizerStore((s) => s.selectedPointId);
@@ -79,7 +122,10 @@ export default function DataTable() {
         accessorKey: 'series_id',
         header: 'Series',
         cell: ({ row }) => (
-          <span className="font-medium">{row.original.series_id}</span>
+          <EditableIntegerCell
+            value={row.original.series_id}
+            onCommit={(v) => updatePointField(row.original.id, 'series_id', v)}
+          />
         ),
       },
       {

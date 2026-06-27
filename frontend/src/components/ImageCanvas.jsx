@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stage, Layer, Image as KonvaImage, Circle, Line, Group, Rect } from 'react-konva';
+import { cn } from '@/lib/utils';
 import useImage from 'use-image';
 
 import { useDigitizerStore } from '@/store/useDigitizerStore';
@@ -24,6 +25,8 @@ export default function ImageCanvas() {
   const selectedPointId = useDigitizerStore((s) => s.selectedPointId);
   const setSelectedPointId = useDigitizerStore((s) => s.setSelectedPointId);
   const movePoint = useDigitizerStore((s) => s.movePoint);
+  const addPoint = useDigitizerStore((s) => s.addPoint);
+  const [addMode, setAddMode] = useState(false);
   const deletePoint = useDigitizerStore((s) => s.deletePoint);
 
   const [image] = useImage(imageUrl || '', 'anonymous');
@@ -120,7 +123,10 @@ export default function ImageCanvas() {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full min-h-[420px] rounded-lg border bg-muted/30 overflow-hidden"
+      className={cn(
+        "relative w-full h-full min-h-[420px] rounded-lg border bg-muted/30 overflow-hidden",
+        addMode && "cursor-crosshair"
+      )}
     >
       {!imageUrl ? (
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -134,18 +140,25 @@ export default function ImageCanvas() {
           scaleY={scale}
           x={stagePos.x}
           y={stagePos.y}
-          draggable
+          draggable={!addMode}    // <-- disable pan while adding so click ≠ drag
           onDragEnd={(e) => {
             if (e.target == e.target.getStage()) {
-              setStagePos({x: e.target.x(), y: e.target.y()})}
+              setStagePos({ x: e.target.x(), y: e.target.y() });
             }
-          }
+          }}
           onWheel={handleWheel}
           onMouseDown={(e) => {
-            // Click on empty stage clears selection.
-            if (e.target === e.target.getStage() || e.target.attrs?.name === 'bg') {
-              setSelectedPointId(null);
+            const stage = e.target.getStage();
+            const isBg = e.target === stage || e.target.attrs?.name === 'bg';
+
+            if (addMode && isBg) {
+              const pos = stage.getPointerPosition();
+              const px = (pos.x - stagePos.x) / scale;
+              const py = (pos.y - stagePos.y) / scale;
+              addPoint(px, py, 0);
+              return;
             }
+            if (isBg) setSelectedPointId(null);
           }}
         >
           <Layer>
@@ -204,9 +217,23 @@ export default function ImageCanvas() {
         </Stage>
       )}
       {imageUrl && (
-        <div className="pointer-events-none absolute bottom-2 right-2 rounded bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
-          drag to pan · scroll to zoom · drag marker to move · right-click / dbl-click to delete
-        </div>
+        <>
+          <button
+            type="button"
+            onClick={() => setAddMode((v) => !v)}
+            className={cn(
+              "absolute top-2 right-2 z-10 rounded px-2 py-1 text-xs font-medium border transition-colors",
+              addMode
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background/90 text-foreground hover:bg-accent"
+            )}
+          >
+            {addMode ? "✓ click empty space to add" : "+ Add point"}
+          </button>
+          <div className="pointer-events-none absolute bottom-2 right-2 rounded bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
+            drag to pan · scroll to zoom · drag marker to move · right-click / dbl-click to delete · toggle "Add point" to insert
+          </div>
+        </>
       )}
     </div>
   );

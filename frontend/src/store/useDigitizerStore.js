@@ -150,6 +150,31 @@ export const useDigitizerStore = create((set, get) => ({
     });
   },
 
+  addPoint(pixelX, pixelY, seriesId = 0) {
+    const { affine, axes, points } = get();
+    if (!affine || !axes) return;
+    get().pushHistory();
+    const scales = getScales(axes);
+    const { x, y } = pixelToData(pixelX, pixelY, affine, scales);
+    const id =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    set({
+      points: [
+        ...points,
+        {
+          id,
+          series_id: seriesId,
+          x, y,
+          delta_x: 0, delta_y: 0,
+          pixel_x: pixelX, pixel_y: pixelY,
+        },
+        ],
+      selectedPointId: id,
+    });
+  },
+
   deletePoint(id) {
     get().pushHistory();
     set((state) => ({
