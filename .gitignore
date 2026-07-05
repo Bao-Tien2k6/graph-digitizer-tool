@@ -4,3 +4,6 @@ venv/
 __pycache__/
 *.pyc
 tests/result/
+frontend/node_modules/
+frontend/dist/
+.env
