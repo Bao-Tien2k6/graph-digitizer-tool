@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import asyncio
 import io
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import cv2
@@ -28,6 +30,7 @@ import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from paddleocr import PaddleOCR
 
 from api.schemas import (
@@ -118,12 +121,20 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="PlotDigitizer API", lifespan=lifespan)
 
+# Cross-origin access. In the single-container deployment the frontend is served
+# from this same origin (see the static mount at the bottom of this file), so no
+# CORS is needed. For a split deployment (frontend hosted separately), list the
+# frontend origin(s) in the ALLOWED_ORIGINS env var, comma-separated.
+_DEFAULT_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -307,3 +318,17 @@ def calibrate(req: CalibrateRequest) -> CalibrateResponse:
 def delete_session(session_id: str) -> dict:
     existed = SESSIONS.pop(session_id, None) is not None
     return {"deleted": existed}
+
+
+# Serve the built frontend (single-origin deployment) -----------------------
+#
+# Mounted LAST so every ``/api/*`` route above takes precedence. When the Vite
+# bundle has been built to ``frontend/dist`` (done in the Docker image), this
+# lets one uvicorn process serve both the API and the web UI — no nginx, no
+# proxy, no CORS. In local dev the ``dist`` dir is absent, so this is skipped
+# and the Vite dev server on :5173 proxies ``/api`` to the backend instead.
+_FRONTEND_DIST = Path(
+    os.getenv("FRONTEND_DIST", Path(__file__).resolve().parent.parent / "frontend" / "dist")
+)
+if _FRONTEND_DIST.is_dir():
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")
