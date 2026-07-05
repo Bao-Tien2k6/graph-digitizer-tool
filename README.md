@@ -393,3 +393,53 @@ print(f"Extracted {len(result.points)} points → {result.output_paths}")
 ```bash
 deactivate
 ```
+
+---
+
+## Deployment Options
+
+For a server, the frontend is built to static files and served by the FastAPI
+process itself — **one container, one origin, no CORS, no nginx**. The frontend
+calls relative `/api/*` paths, so nothing needs reconfiguring.
+
+### Docker Compose (recommended)
+
+```bash
+docker compose up -d --build
+```
+
+Then open **http://your-server:8000**. This builds the Vite bundle, installs the
+Python + CV dependencies, and runs a single-worker uvicorn that serves both the
+API and the web UI. The `paddle-cache` named volume persists the ~100 MB
+PaddleOCR weights so they are downloaded only once.
+
+### Plain Docker
+
+```bash
+docker build -t graph-digitizer .
+docker run -d -p 8000:8000 -v paddle-cache:/home/appuser/.paddleocr graph-digitizer
+```
+
+### Without Docker
+
+```bash
+cd frontend && npm ci && npm run build && cd ..     # → frontend/dist/
+pip install -r requirements.txt
+uvicorn api.main:app --host 0.0.0.0 --port 8000     # serves dist/ automatically
+```
+
+### Configuration
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated CORS origins. Only needed for a **split** deploy (frontend hosted separately from the API); leave unset for the single-origin setup above. |
+| `FRONTEND_DIST` | `<repo>/frontend/dist` | Path to the built frontend. When the directory is absent (e.g. local dev), static serving is skipped and the Vite dev server proxies `/api` instead. |
+
+### Scaling constraint
+
+Run **one worker only**. Session state (decoded images + detection results)
+lives in an in-process dict — under multiple workers a `/calibrate` request can
+land on a worker that never handled the matching `/digitize` and will 404. Scale
+vertically, or move session state to Redis/disk first. See the note at the top
+of [api/main.py](api/main.py).
+```
