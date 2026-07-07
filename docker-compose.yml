@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     image: graph-digitizer:latest
     ports:
-      - "8000:8000"
+      - "2006:8000"
     environment:
       # Same-origin deploy needs no CORS. Uncomment and set if you host the
       # frontend separately (comma-separated list of allowed origins):
