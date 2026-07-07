@@ -27,9 +27,11 @@ ENV PYTHONUNBUFFERED=1 \
     FRONTEND_DIST=/app/frontend/dist \
     HOME=/home/appuser
 
-# System libs required by paddlepaddle (libgomp1) and OpenCV headless (libglib2.0-0).
+# System libs required by paddlepaddle (libgomp1) and OpenCV (libglib2.0-0,
+# libgl1). PaddleOCR pulls in a full opencv-python build transitively, which
+# needs libGL.so.1 (libgl1) despite our pinned opencv-contrib-python-headless.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgomp1 libglib2.0-0 \
+    && apt-get install -y --no-install-recommends libgomp1 libglib2.0-0 libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
